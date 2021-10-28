@@ -2,6 +2,8 @@ From running a Lasso with alpha = 1 we can see about 18 variables have a coeffic
 
 columns X_train[['x193', 'x297', 'x339', 'x629']] are all 0
 
+x251 is nearly only zeros with a few values in between
+
 59 cols vary only by a very small amount X_train.loc[:, X_train.var()<0.01].columns: 
         ['x1', 'x2', 'x6', 'x9', 'x16', 'x34', 'x50', 'x78', 'x82', 'x83',
        'x145', 'x153', 'x166', 'x193', 'x195', 'x206', 'x232', 'x256', 'x263',
@@ -12,3 +14,4 @@ columns X_train[['x193', 'x297', 'x339', 'x629']] are all 0
        'x755', 'x762', 'x778', 'x811']
 
 see picture of plot and table to see how good prediction with few variables is. It seem with the 20 best variables in a LASSO the R^2 is still reasonably good while having a substantially smaller variable set.
+

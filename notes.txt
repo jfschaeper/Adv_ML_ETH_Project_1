@@ -15,3 +15,4 @@ x251 is nearly only zeros with a few values in between
 
 see picture of plot and table to see how good prediction with few variables is. It seem with the 20 best variables in a LASSO the R^2 is still reasonably good while having a substantially smaller variable set.
 
+Only the first 25 new interactions actually really improve

@@ -1,1 +1,62 @@
 # real predictions done here
+import pandas as pd
+import numpy as np
+import os
+import sys
+from math import comb
+from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import Lasso
+from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import KFold
+from sklearn.linear_model import LassoCV
+from functions import *
+
+# change working directory to file location
+# os.chdir('src/')
+
+
+# load data
+X_train = pd.read_csv("../data/X_train.csv").drop(['id'], axis=1)
+X_test = pd.read_csv("../data/X_test.csv").drop(['id'], axis=1)
+y_train = pd.read_csv("../data/y_train.csv").drop(['id'], axis=1)
+
+
+# code such that test and train data are both manipulated at the same time
+X = pd.concat([X_train, X_test])
+# impute data with median value 
+X = X.fillna(X.median())
+X = X.drop(X.loc[:, X.var()<0.0001].columns, axis=1)
+X=(X-X.mean())/X.std() # normalise the data
+X['data'] = ['train'] * X_train.shape[0]  +  ['test'] * X_test.shape[0]
+X_train = X.loc[X['data'] == 'train'].drop("data", axis=1)
+X_test = X.loc[X['data'] == 'test',:].drop("data", axis=1)
+
+
+# cant run on all columns since it would take 5 days, hence use the top 137 lasso variables
+# this just creates a df that we want to engineer on
+lasso_select = LassoCV(cv=10, random_state=42, tol=1e-2).fit(X_train, np.ravel(y_train))
+selected_features = pd.DataFrame({'variable' : X_train.columns[abs(lasso_select.coef_) > 0.001], 'coef' : lasso_select.coef_[abs(lasso_select.coef_) > 0.001]}).sort_values(by='coef', ascending=False)
+X_train_selected = X_train[selected_features['variable'].values]
+
+
+# do feature engineering on training set
+model = LinearRegression()
+path = '../out/X_engineered.csv'
+X_train_engineered = feature_engineering(X_train_selected, y_train, model, 5, 4, 'r2', 5, 50, path)
+
+
+# apply engineering to test data
+features = X_train_engineered.columns
+X_test_engineered = engineered_testdata(X_test, features)
+
+
+# fit prediction model
+lasso_predict = LassoCV(cv=10, random_state=42).fit(X_train_engineered, np.ravel(y_train))
+score = lasso_predict.score(X_train_engineered, np.ravel(y_train))
+print('The crossvalidation score is: ', score)
+
+
+# predict based on engineered test data
+y_test = pd.DataFrame({'id' : range(X_test_engineered.shape[0])})
+y_test['y'] = lasso_predict.predict(X_test_engineered)
+y_test.to_csv('../out/y_test.csv', index=False)

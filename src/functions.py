@@ -65,7 +65,7 @@ def feature_engineering(X, y, model, folds, deg_poly, score, n_jobs, top, path):
     return X
 
 
-def engineered_testdata(X_test, features):
+def engineered_testdata(X_test, features, path):
     # takes the test data and manipulates it in the same way the training data was manipulated
     n =  X_test.shape[0]
     X_test_eng = pd.DataFrame(columns=features, index=range(n))
@@ -75,5 +75,7 @@ def engineered_testdata(X_test, features):
         for col in cols:
             feat_eng = feat_eng * np.array(X_test[col])
         X_test_eng[feature] = feat_eng.T
+
+    X_test_eng.to_csv(path)
 
     return X_test_eng

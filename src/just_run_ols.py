@@ -32,28 +32,32 @@ X_train = X.loc[X['data'] == 'train'].drop("data", axis=1)
 X_test = X.loc[X['data'] == 'test',:].drop("data", axis=1)
 
 
-# cant run on all columns since it would take 5 days, hence use the top 137 lasso variables
-# this just creates a df that we want to engineer on
-lasso_select = LassoCV(cv=10, random_state=42, tol=1e-2).fit(X_train, np.ravel(y_train))
+# select the variables that seem to matter the most to reduce dimensionality
+# run Lasso to see which alpha gives the highest crossvalidation score
+lasso_baseline = LassoCV(cv=10, random_state=42, tol=1e-2).fit(X_train, np.ravel(y_train))
+# then run new Lasso with slightly higher alpha to have a few features added that could be relevant
+alpha = lasso_baseline.alpha_ + 0.1
+lasso_select = Lasso(alpha=alpha).fit(X_train, np.ravel(y_train))
 selected_features = pd.DataFrame({'variable' : X_train.columns[abs(lasso_select.coef_) > 0.001], 'coef' : lasso_select.coef_[abs(lasso_select.coef_) > 0.001]}).sort_values(by='coef', ascending=False)
 X_train_selected = X_train[selected_features['variable'].values]
 
 
 # do feature engineering on training set
 model = LinearRegression()
-path = '../out/X_engineered.csv'
+path = '../out/X_train_engineered.csv'
 X_train_engineered = feature_engineering(X_train_selected, y_train, model, 5, 4, 'r2', 5, 50, path)
 
 
 # apply engineering to test data
 features = X_train_engineered.columns
-X_test_engineered = engineered_testdata(X_test, features)
+path = '../out/X_test_engineered.csv'
+X_test_engineered = engineered_testdata(X_test, features, path)
 
 
 # fit prediction model
-lasso_predict = LassoCV(cv=10, random_state=42).fit(X_train_engineered, np.ravel(y_train))
+lasso_predict = LassoCV(cv=10, random_state=42, tol=1e-2).fit(X_train_engineered, np.ravel(y_train))
 score = lasso_predict.score(X_train_engineered, np.ravel(y_train))
-print('The crossvalidation score is: ', score)
+print('The crossvalidation score is: ', score, " while the baseline score is: ", lasso_baseline.score(X_train, np.ravel(y_train)))
 
 
 # predict based on engineered test data

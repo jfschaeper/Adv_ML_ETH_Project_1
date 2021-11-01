@@ -23,7 +23,7 @@ def feature_engineering(X, y, model, folds, deg_poly, score, n_jobs, top, path):
     for d in range(deg_poly): # loop over the degree of polynomials
         features = list(X.columns.drop('interaction', errors='ignore'))
 
-        # only interact the current features with the new features to avoid working twice
+        # only interact the current features with the new features to avoid working twice; could be deleted
         if 'new_features' in locals(): 
             features_interact = new_features 
             num_poly = comb(len(features_interact),2) + len(features_interact)*len(features)
@@ -43,24 +43,38 @@ def feature_engineering(X, y, model, folds, deg_poly, score, n_jobs, top, path):
                 
                 if name_interaction not in tested_interactions: # features.index(feature_A) >= features.index(feature_B): # >= to create x^2 etc. (but x^3 is only created if x^2 has been chosen) # make sure this interaction has not been done
                     tested_interactions.append(name_interaction) # save that this interaction has been calculated
-                    print(feature_A, feature_B)
 
                     X['interaction'] = X[feature_A] * X[feature_B]
                     score_eval = np.mean(cross_val_score(model, X, y, scoring=score, cv=crossvalidation, n_jobs=n_jobs))
                     
                     if score_eval > baseline: # only store new interaction if it improves on baseline
-                        
                         eval_interactions.iloc[i, : ] = pd.Series({'feature_A:feature_B' : name_interaction, score : round(score_eval,4)})
                         data_interactions.iloc[:, i] = X['interaction'] # store the good interaction data
                         data_interactions.rename(columns={i : name_interaction}, inplace=True) # give column the feature name
                         i+=1
-        
-        # could quickly check the "pure" polynomials for each degree
 
+        # check "pure" polynomials
+        for feature in orig_features:
+
+            name_interaction = ":".join([feature]*d)
+            
+            if name_interaction not in tested_interactions: # features.index(feature_A) >= features.index(feature_B): # >= to create x^2 etc. (but x^3 is only created if x^2 has been chosen) # make sure this interaction has not been done
+                tested_interactions.append(name_interaction) # save that this interaction has been calculated
+
+                X['interaction'] = np.power(X[feature], d)
+                score_eval = np.mean(cross_val_score(model, X, y, scoring=score, cv=crossvalidation, n_jobs=n_jobs))
+
+                if score_eval > baseline: # only store new interaction if it improves on baseline
+                            eval_interactions.iloc[i, : ] = pd.Series({'feature_A:feature_B' : name_interaction, score : round(score_eval,4)})
+                            data_interactions.iloc[:, i] = X['interaction'] # store the good interaction data
+                            data_interactions.rename(columns={i : name_interaction}, inplace=True) # give column the feature name
+                            i+=1
+
+        # choose features and define X new
         new_features = eval_interactions.sort_values(by=score, ascending=False, ignore_index=True).loc[0:top, 'feature_A:feature_B'] # new features are the top ones of the engineered ones
         X = pd.concat([X.drop('interaction', axis=1, errors='ignore'), data_interactions[new_features]], axis=1)
 
-        X.to_csv(path, index=False)
+    X.to_csv(path, index=False)
 
     return X
 

@@ -35,10 +35,10 @@ X_test = X.loc[X['data'] == 'test',:].drop("data", axis=1)
 # select the variables that seem to matter the most to reduce dimensionality
 # run Lasso to see which alpha gives the highest crossvalidation score
 lasso_baseline = LassoCV(cv=10, random_state=42, tol=1e-2).fit(X_train, np.ravel(y_train))
-# then run new Lasso with slightly higher alpha to have a few features added that could be relevant
-alpha = lasso_baseline.alpha_ + 0.1
+# then run new Lasso with slightly lower alpha to have a few features added that could be relevant
+alpha = lasso_baseline.alpha_ - 0.05
 lasso_select = Lasso(alpha=alpha).fit(X_train, np.ravel(y_train))
-selected_features = pd.DataFrame({'variable' : X_train.columns[abs(lasso_select.coef_) > 0.001], 'coef' : lasso_select.coef_[abs(lasso_select.coef_) > 0.001]}).sort_values(by='coef', ascending=False)
+selected_features = pd.DataFrame({'variable' : X_train.columns[abs(lasso_select.coef_) > 0.0001], 'coef' : lasso_select.coef_[abs(lasso_select.coef_) > 0.0001]}).sort_values(by='coef', ascending=False)
 X_train_selected = X_train[selected_features['variable'].values]
 
 

@@ -5,6 +5,10 @@ import pandas as pd
 import numpy as np
 from math import comb
 
+def normalise(X):
+    X = (X-X.mean())/X.std()
+    return  X
+
 def sort_feature_names(s, orig_features):
     # sorts s based on the order in orig_features which makes sure that features that combine the same columns have the same name and can be dropped base on the name
     index = [(lambda x: orig_features.index(x))(x) for x in s.split(':')]
@@ -90,6 +94,6 @@ def engineered_testdata(X_test, features, path):
             feat_eng = feat_eng * np.array(X_test[col])
         X_test_eng[feature] = feat_eng.T
 
-    X_test_eng.to_csv(path)
+    X_test_eng.to_csv(path, index=False)
 
     return X_test_eng

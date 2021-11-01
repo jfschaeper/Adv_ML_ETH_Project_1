@@ -1,4 +1,5 @@
 # real predictions done here
+from numpy.random import normal
 import pandas as pd
 import numpy as np
 import os
@@ -26,7 +27,7 @@ X = pd.concat([X_train, X_test])
 # impute data with median value 
 X = X.fillna(X.median())
 X = X.drop(X.loc[:, X.var()<0.0001].columns, axis=1)
-X=(X-X.mean())/X.std() # normalise the data
+X = normalise(X) # normalise the data
 X['data'] = ['train'] * X_train.shape[0]  +  ['test'] * X_test.shape[0]
 X_train = X.loc[X['data'] == 'train'].drop("data", axis=1)
 X_test = X.loc[X['data'] == 'test',:].drop("data", axis=1)
@@ -55,12 +56,16 @@ X_test_engineered = engineered_testdata(X_test, features, path)
 
 
 # fit prediction model
-lasso_predict = LassoCV(cv=10, random_state=42, tol=1e-2).fit(X_train_engineered, np.ravel(y_train))
+X_train_engineered = pd.read_csv('../out/X_train_engineered.csv')
+X_train_engineered = normalise(X_train_engineered)
+lasso_predict = LassoCV(cv=10, random_state=42, ).fit(X_train_engineered, np.ravel(y_train))
 score = lasso_predict.score(X_train_engineered, np.ravel(y_train))
 print('The crossvalidation score is: ', score, " while the baseline score is: ", lasso_baseline.score(X_train, np.ravel(y_train)))
 
 
 # predict based on engineered test data
+X_test_engineered = pd.read_csv('../out/X_test_engineered.csv').iloc[:,1:]
+X_test_engineered = normalise(X_test_engineered)
 y_test = pd.DataFrame({'id' : range(X_test_engineered.shape[0])})
 y_test['y'] = lasso_predict.predict(X_test_engineered)
 y_test.to_csv('../out/y_test.csv', index=False)

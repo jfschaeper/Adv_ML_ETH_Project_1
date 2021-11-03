@@ -11,6 +11,10 @@ from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import KFold
 from sklearn.linear_model import LassoCV
 from functions import *
+import sklearn.neighbors._base
+sys.modules['sklearn.neighbors.base'] = sklearn.neighbors._base
+from missingpy import MissForest
+import time 
 
 # change working directory to file location
 # os.chdir('src/')
@@ -24,9 +28,21 @@ y_train = pd.read_csv("../data/y_train.csv").drop(['id'], axis=1)
 
 # code such that test and train data are both manipulated at the same time
 X = pd.concat([X_train, X_test])
-# impute data with median value 
-X = X.fillna(X.median())
 X = X.drop(X.loc[:, X.var()<0.0001].columns, axis=1)
+
+# outlier
+
+
+# impute data with median value 
+# X = X.fillna(X.median())
+t = time.process_time()
+imputer = MissForest(max_iter=10, n_estimators=20, criterion='squared_error')
+X_imputed = imputer.fit_transform(X)
+elapsed_time = time.process_time() - t
+X_imputed.to_csv('../out/X_imputed.csv', index=False)
+print("X has been imputed in: ", elapsed_time)
+
+
 X = normalise(X) # normalise the data
 X['data'] = ['train'] * X_train.shape[0]  +  ['test'] * X_test.shape[0]
 X_train = X.loc[X['data'] == 'train'].drop("data", axis=1)

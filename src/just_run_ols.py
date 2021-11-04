@@ -1,8 +1,11 @@
 # real predictions done here
+import os
+# change working directory to file location
+# os.chdir('src/')
+
 from numpy.random import normal
 import pandas as pd
 import numpy as np
-import os
 import sys
 from math import comb
 from sklearn.linear_model import LinearRegression
@@ -15,9 +18,6 @@ import sklearn.neighbors._base
 sys.modules['sklearn.neighbors.base'] = sklearn.neighbors._base
 from missingpy import MissForest
 import time 
-
-# change working directory to file location
-# os.chdir('src/')
 
 
 # load data
@@ -35,15 +35,14 @@ X = X.drop(X.loc[:, X.var()<0.0001].columns, axis=1)
 
 # impute data with median value 
 # X = X.fillna(X.median())
-t = time.process_time()
-imputer = MissForest(max_iter=10, n_estimators=20, criterion='squared_error')
-X_imputed = imputer.fit_transform(X)
-elapsed_time = time.process_time() - t
+print("Imputing")
+imputer = MissForest(max_iter=5, n_estimators=30, criterion='squared_error', max_features=None)
+X_imputed = pd.DataFrame(imputer.fit_transform(X), columns=X.columns)
 X_imputed.to_csv('../out/X_imputed.csv', index=False)
-print("X has been imputed in: ", elapsed_time)
 
 
-X = normalise(X) # normalise the data
+
+X = normalise(X_imputed) # normalise the data
 X['data'] = ['train'] * X_train.shape[0]  +  ['test'] * X_test.shape[0]
 X_train = X.loc[X['data'] == 'train'].drop("data", axis=1)
 X_test = X.loc[X['data'] == 'test',:].drop("data", axis=1)
@@ -53,16 +52,17 @@ X_test = X.loc[X['data'] == 'test',:].drop("data", axis=1)
 # run Lasso to see which alpha gives the highest crossvalidation score
 lasso_baseline = LassoCV(cv=10, random_state=42, tol=1e-2).fit(X_train, np.ravel(y_train))
 # then run new Lasso with slightly lower alpha to have a few features added that could be relevant
-alpha = lasso_baseline.alpha_ - 0.05
+alpha = lasso_baseline.alpha_ - 0.01
 lasso_select = Lasso(alpha=alpha).fit(X_train, np.ravel(y_train))
 selected_features = pd.DataFrame({'variable' : X_train.columns[abs(lasso_select.coef_) > 0.0001], 'coef' : lasso_select.coef_[abs(lasso_select.coef_) > 0.0001]}).sort_values(by='coef', ascending=False)
 X_train_selected = X_train[selected_features['variable'].values]
 
 
 # do feature engineering on training set
+print("feature engineering")
 model = LinearRegression()
 path = '../out/X_train_engineered.csv'
-X_train_engineered = feature_engineering(X_train_selected, y_train, model, 5, 4, 'r2', 5, 50, path)
+X_train_engineered = feature_engineering(X_train_selected, y_train, model, 10, 3, 'r2', -1, 50, path)
 
 
 # apply engineering to test data
@@ -74,13 +74,13 @@ X_test_engineered = engineered_testdata(X_test, features, path)
 # fit prediction model
 X_train_engineered = pd.read_csv('../out/X_train_engineered.csv')
 X_train_engineered = normalise(X_train_engineered)
-lasso_predict = LassoCV(cv=10, random_state=42, ).fit(X_train_engineered, np.ravel(y_train))
+lasso_predict = LassoCV(cv=10, random_state=42).fit(X_train_engineered, np.ravel(y_train))
 score = lasso_predict.score(X_train_engineered, np.ravel(y_train))
 print('The crossvalidation score is: ', score, " while the baseline score is: ", lasso_baseline.score(X_train, np.ravel(y_train)))
 
 
 # predict based on engineered test data
-X_test_engineered = pd.read_csv('../out/X_test_engineered.csv').iloc[:,1:]
+X_test_engineered = pd.read_csv('../out/X_test_engineered.csv')
 X_test_engineered = normalise(X_test_engineered)
 y_test = pd.DataFrame({'id' : range(X_test_engineered.shape[0])})
 y_test['y'] = lasso_predict.predict(X_test_engineered)

@@ -9,6 +9,17 @@ def normalise(X):
     X = (X-X.mean())/X.std()
     return  X
 
+def correct_outlier(X, std_cap):
+    # corrects outliers by replacing every value above the std_cap by the std_cap
+    for col in X.columns:
+        col_values = X[col]
+        z_scores = normalise(col_values)
+        col_values[z_scores > std_cap] = col_values.mean() + std_cap*(col_values.std())
+        col_values[z_scores < -std_cap] = col_values.mean() - std_cap*(col_values.std())
+
+        X[col] = col_values
+    return X
+
 def sort_feature_names(s, orig_features):
     # sorts s based on the order in orig_features which makes sure that features that combine the same columns have the same name and can be dropped base on the name
     index = [(lambda x: orig_features.index(x))(x) for x in s.split(':')]

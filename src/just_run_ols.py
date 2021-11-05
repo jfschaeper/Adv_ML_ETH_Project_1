@@ -15,10 +15,11 @@ from sklearn.model_selection import KFold
 from sklearn.linear_model import LassoCV
 from functions import *
 import sklearn.neighbors._base
-sys.modules['sklearn.neighbors.base'] = sklearn.neighbors._base
+sys.modules['sklearn.neighbors.base'] = sklearn.neighbors._base # needed for MissForest
 from missingpy import MissForest
 import time 
-
+from sklearn.ensemble import IsolationForest
+from scipy.stats.mstats import winsorize
 
 # load data
 X_train = pd.read_csv("../data/X_train.csv").drop(['id'], axis=1)
@@ -30,23 +31,40 @@ y_train = pd.read_csv("../data/y_train.csv").drop(['id'], axis=1)
 X = pd.concat([X_train, X_test])
 X = X.drop(X.loc[:, X.var()<0.0001].columns, axis=1)
 
-# outlier
-
-
+# Impute 1:
 # impute data with median value 
-# X = X.fillna(X.median())
-print("Imputing")
-imputer = MissForest(max_iter=5, n_estimators=30, criterion='squared_error', max_features=None)
-X_imputed = pd.DataFrame(imputer.fit_transform(X), columns=X.columns)
-X_imputed.to_csv('../out/X_imputed.csv', index=False)
+# X_imputed = X.fillna(X.median())
 
+# Impute 2:
+# print("Imputing with MissForest. Will take a long time")
+# imputer = MissForest(max_iter=5, n_estimators=30, criterion='squared_error', max_features=None)
+# X_imputed = pd.DataFrame(imputer.fit_transform(X), columns=X.columns)
+# X_imputed.to_csv('../out/X_imputed.csv', index=False)
 
+# outlier:
+X_imputed = pd.read_csv('../out/X_imputed.csv')
+#Isolation forest (super fast)
+# isoF_model = IsolationForest(n_estimators = 2000, random_state=0, contamination = 0.05)
+# isoF = isoF_model.fit(X_imputed) # can use later to retrieve y
+# isoF.predict(X_imputed.x1)
+# isoF_inliers = np.squeeze(X_imputed[np.where(isoF == 1), :])
+# pd.DataFrame(isoF_inliers).to_csv('../out/iso_X.csv', index=False)
+# #isoF computes a score that can be used to correlate with abod score
+# isoF_scores = isoF_model.score_samples(X_imputed)
 
-X = normalise(X_imputed) # normalise the data
+# outlier based on z score per column and cap values at +-2 standard deviations for each column
+# X_no_outlier = correct_outlier(X_imputed, 2)
+# winsorize
+X_no_outlier = X_imputed.apply(lambda x: winsorize(x ,limits=[0.05, 0.05]), axis=0)
+# save data
+X_no_outlier.to_csv('../out/X_no_outlier.csv', index=False)
+
+# split test and train again
+X_no_outlier = pd.read_csv("../out/X_no_outlier.csv")
+X = normalise(X_no_outlier) # normalise the data
 X['data'] = ['train'] * X_train.shape[0]  +  ['test'] * X_test.shape[0]
 X_train = X.loc[X['data'] == 'train'].drop("data", axis=1)
 X_test = X.loc[X['data'] == 'test',:].drop("data", axis=1)
-
 
 # select the variables that seem to matter the most to reduce dimensionality
 # run Lasso to see which alpha gives the highest crossvalidation score
@@ -62,7 +80,7 @@ X_train_selected = X_train[selected_features['variable'].values]
 print("feature engineering")
 model = LinearRegression()
 path = '../out/X_train_engineered.csv'
-X_train_engineered = feature_engineering(X_train_selected, y_train, model, 10, 3, 'r2', -1, 50, path)
+X_train_engineered = feature_engineering(X_train_selected, y_train, model, 7, 3, 'r2', -1, 50, path)
 
 
 # apply engineering to test data

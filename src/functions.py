@@ -4,21 +4,87 @@ from sklearn.model_selection import KFold
 import pandas as pd
 import numpy as np
 from math import comb
+from scipy.stats.mstats import winsorize
+from pyod.models.abod import ABOD
+from sklearn.ensemble import IsolationForest
 
 def normalise(X):
     X = (X-X.mean())/X.std()
     return  X
 
-def correct_outlier(X, std_cap):
-    # corrects outliers by replacing every value above the std_cap by the std_cap
+def isoF(X):
+    #run isolastion forest for outlier detection
+    #assume 5% of the observations are outliers
+        #score: lower for outliers: to be used as regression weight
+        #inlier: =1 for inlier
+    model = IsolationForest(n_estimators = 2000, random_state=0, contamination = 0.05)
+    inliers = model.fit_predict(X) == 1 
+    scores = model.score_samples(X) # the lower the more abnormal
+    return inliers, scores
+
+def abod(X):
+    model = ABOD(method = "default", contamination = 0.05)
+    model.fit(X)
+    inliers = model.labels_ == 0
+    scores = model.decision_scores_ # the higher the more abnormal
+    return inliers, scores
+
+def winsor(X):
+    X=pd.DataFrame(X)
+    X=X.apply(lambda x: winsorize(x ,limits=[0.05, 0.05]), axis=0)
+    return X.to_numpy()
+
+def zscored(X, std_cap = 2.5):
+    X=pd.DataFrame(X)
     for col in X.columns:
         col_values = X[col]
         z_scores = normalise(col_values)
         col_values[z_scores > std_cap] = col_values.mean() + std_cap*(col_values.std())
         col_values[z_scores < -std_cap] = col_values.mean() - std_cap*(col_values.std())
-
         X[col] = col_values
-    return X
+    return X.to_numpy() 
+
+def weight_score(X, score):
+    weighted_X = np.empty_like(X)
+    for i in range(0, X.shape[0]):
+        weighted_X[i, :] = X[i, :] * score[i]
+    return weighted_X
+    
+def process_features(X, y, outlier_method):
+    # Takes as input the features X, labels y as a numpy array
+    # outputs processed features by cleaning and imputation
+    # outlier method either: string:
+        # winsorize: winsorize data at 5th and 95th percentile
+        # zscore: replace all values more than 2 standard deviations by the tail value
+        # abod_weight: weights the data by inverse of the abod score
+        # isoF_weight: weights the data by isolation forest outlier score
+        # abod_drop: drop the abod outliers from the X, y matrix
+        # isoF_drop: drop the isolation forest outliers
+    if outlier_method == "winsorize":
+        X = winsor(X)
+        return X, y
+    elif outlier_method == "zscore":
+        X = zscored(X, std_cap = 2.5)
+        return X, y
+    elif outlier_method == "abod_weight":
+        inliers, scores = abod(X)
+        scores = normalise(np.abs(scores)) # weights all negative, with large negative value indicating inlier
+        X = weight_score(X, scores)
+        y = y*scores
+        return X, y
+    elif outlier_method == "isoF_weight":
+        inliers, scores = isoF(X)
+        scores = normalise(1/np.abs(scores)) # weights all negative, with large negative values indicating outlier
+        X = weight_score(X, scores)
+        y = y*scores
+        return X, y
+    elif outlier_method == "abod_drop":
+        inliers, scores = abod(X)
+        X, y = np.squeeze(X[inliers, :]), np.squeeze(y[inliers])
+    elif outlier_method == "isoF_drop":
+        inliers, scores = isoF(X)
+        X, y = np.squeeze(X[inliers, :]), np.squeeze(y[inliers])
+    return X, y
 
 def sort_feature_names(s, orig_features):
     # sorts s based on the order in orig_features which makes sure that features that combine the same columns have the same name and can be dropped base on the name

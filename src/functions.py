@@ -81,10 +81,11 @@ def process_features(X, y, outlier_method):
     elif outlier_method == "abod_drop":
         inliers, scores = abod(X)
         X, y = np.squeeze(X[inliers, :]), np.squeeze(y[inliers])
+        return X, y
     elif outlier_method == "isoF_drop":
         inliers, scores = isoF(X)
         X, y = np.squeeze(X[inliers, :]), np.squeeze(y[inliers])
-    return X, y
+        return X, y
 
 def sort_feature_names(s, orig_features):
     # sorts s based on the order in orig_features which makes sure that features that combine the same columns have the same name and can be dropped base on the name

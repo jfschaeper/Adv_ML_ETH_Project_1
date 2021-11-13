@@ -7,6 +7,8 @@ from math import comb
 from scipy.stats.mstats import winsorize
 from pyod.models.abod import ABOD
 from sklearn.ensemble import IsolationForest
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import r2_score
 
 def normalise(X):
     X = (X-X.mean())/X.std()
@@ -31,7 +33,7 @@ def abod(X):
 
 def winsor(X):
     X=pd.DataFrame(X)
-    X=X.apply(lambda x: winsorize(x ,limits=[0.05, 0.05]), axis=0)
+    X=X.apply(lambda x: winsorize(x ,limits=[0.025, 0.025]), axis=0)
     return X.to_numpy()
 
 def zscored(X, std_cap = 2.5):
@@ -175,3 +177,20 @@ def engineered_testdata(X_test, features, path):
     X_test_eng.to_csv(path, index=False)
 
     return X_test_eng
+
+def eval_ensemble(X, y, models, folds):
+    # take multitple models see how the do together
+    # models are in a list
+    r2 = [None] * (folds-1)
+    for k in range(folds-1):
+        predictions = pd.DataFrame(columns=range(len(models)))
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=k)
+        i=0
+        for model in models:
+            predictions.iloc[:,i] = model.fit(X_train, y_train).predict(X_test)
+            i+=1
+        prediction = predictions.mean(axis=1)
+        r2[k] = r2_score(y_test, prediction)
+        print("R2: ", r2[k])
+
+    return np.mean(r2)

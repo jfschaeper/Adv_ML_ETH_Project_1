@@ -1,0 +1,14 @@
+Missing Data: 
+To fill in the missing values in the data we impute all NaNs with iterated imputation based on Missing Forest method. The method imputes missing datapoint by fitting a prediction model using all remaining columns in the data set and is well suited for high dimensional data and prevents overfitting. We iterate 5 times over the data set and consider a random subset of 30 features at each node.
+
+Outlier treatment: 
+We tried winsorisation, zscore, angel based outlier detection and isolation forests for outlier detection and treatment. Via cross validation we decided to go with winsorisation cutting of the 2.5th and 97.5th percentiles.
+
+Feature Selection:
+After imputation and outlier dectection we narrow down the potential set of features via a cross validated Lasso. The Lasso proceedure gives us the best model for the original data. We reduce the optimal Lasso slightly to increase to set of features selected and engineered on.
+
+Feature engineering:
+We use the selected features and create 3rd order polynomials and interactions and iteratively test which engineered feature increase a cross validated R^2 when we fit a linear regression. We use a linear regression for this step for computational speed. 
+
+Prediction:
+We use the engineered features and fit a cross validated Lasso and an XGBoost model. For our final prediction we average the predictions over both models.
